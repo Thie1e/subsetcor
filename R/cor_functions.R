@@ -180,9 +180,11 @@ ci_cor_fisher <- function(alpha, rho, n, Npop) {
     } else {
         sd_z <- Sd_z_finite(Npop = Npop, n = n)
     }
-    ci_upper <- z + qt(1 - alpha / 2, df = n - 1) * sd_z ################## fehlt hier / sqrt(n)?
+    # ci_upper <- z + qt(1 - alpha / 2, df = n - 1) * sd_z
+    ci_upper <- z + qnorm(1 - alpha / 2) * sd_z
     ci_upper <- ztor(ci_upper)
-    ci_lower <- z + qt(alpha / 2, df = n - 1) * sd_z
+    # ci_lower <- z + qt(alpha / 2, df = n - 1) * sd_z
+    ci_lower <- z + qnorm(alpha / 2) * sd_z
     ci_lower <- ztor(ci_lower)
     return(c(cor_ci_lower = ci_lower, cor_ci_upper = ci_upper))
 }
