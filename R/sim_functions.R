@@ -42,16 +42,28 @@ getBiCop_indep <- function(N, mu1 = 0, mu2 = 0, sd1 = 1, sd2 = 1) {
 #'
 #' Code from http://stats.stackexchange.com/questions/15011/generate-a-random-variable-with-a-defined-correlation-to-an-existing-variable
 #' @param N Sample size
-#' @param rho True correlation coefficient in the sample
+#' @param rho True correlation coefficient in the sample if rho_sub is not given,
+#' otherwise rho is the correlation in the rest of the sample that does not belong
+#' to the subset
+#' @param rho_sub Correlation in the subset
+#' @param fraction Fraction of the returned data.frame that belongs to the subset.
+#' The subset consists of the first round(N * fraction) rows
 #' @param mu1 Expected value of the mean of variable x
 #' @param sd1 Expected value of the standard deviation of variable x
-getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA) {
+#' @param type Either "normal" or "lognormal"
+getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
+                           type = "normal") {
     if (sum(is.na(c(rho_sub, fraction))) == 1) stop("Specify both rho_sub and fraction")
     # No differing subset
     if (is.na(rho_sub)) {
         theta <- acos(rho)                            # corresponding angle
-        x1    <- rnorm(N, mu1, sd1)                   # fixed given data
-        x2    <- rnorm(N, 0, 1)                   # new random data
+        if (type == "normal") {
+            x1    <- rnorm(N, mu1, sd1)                   # fixed given data
+            x2    <- rnorm(N, 0, 1)                   # new random data
+        } else if (type == "lognormal") {
+            x1    <- log(rnorm(N, mu1, sd1))                   # fixed given data
+            x2    <- log(rnorm(N, 0, 1))                   # new random data
+        }
         X     <- cbind(x1, x2)                        # matrix
         Xctr  <- scale(X, center=TRUE, scale=FALSE)   # centered columns (mean 0)
 
