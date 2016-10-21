@@ -28,7 +28,8 @@ both are normally distributed, if "log_log" both are lognormally distributed,
 if type = "log_norm" x will be lognormally distributed and y standard normal.}
 }
 \description{
-The correlation between x and y will be exactly rho.
+The correlation between x and y will be exactly rho. If only fraction is given
+but not rho_sub, rho_sub will be set to rho.
 }
 \details{
 Code from http://stats.stackexchange.com/questions/15011/generate-a-random-variable-with-a-defined-correlation-to-an-existing-variable

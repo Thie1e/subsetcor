@@ -38,7 +38,8 @@ getBiCop_indep <- function(N, mu1 = 0, mu2 = 0, sd1 = 1, sd2 = 1) {
 
 #' Simulate bivariate normally distributed data with specified correlation, mean and sd
 #'
-#' The correlation between x and y will be exactly rho.
+#' The correlation between x and y will be exactly rho. If only fraction is given
+#' but not rho_sub, rho_sub will be set to rho.
 #'
 #' Code from http://stats.stackexchange.com/questions/15011/generate-a-random-variable-with-a-defined-correlation-to-an-existing-variable
 #' @param N Sample size
@@ -55,7 +56,8 @@ getBiCop_indep <- function(N, mu1 = 0, mu2 = 0, sd1 = 1, sd2 = 1) {
 #' if type = "log_norm" x will be lognormally distributed and y standard normal.
 getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
                            distribution = "norm_norm") {
-    if (sum(is.na(c(rho_sub, fraction))) == 1) stop("Specify both rho_sub and fraction")
+    if (is.na(rho_sub) & !is.na(fraction)) rho_sub <- rho
+    if (!is.na(rho_sub) & is.na(fraction)) stop("Specify the subset fraction")
     # No differing subset
     if (is.na(rho_sub)) {
         theta <- acos(rho)                            # corresponding angle
