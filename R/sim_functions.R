@@ -48,21 +48,28 @@ getBiCop_indep <- function(N, mu1 = 0, mu2 = 0, sd1 = 1, sd2 = 1) {
 #' @param rho_sub Correlation in the subset
 #' @param fraction Fraction of the returned data.frame that belongs to the subset.
 #' The subset consists of the first round(N * fraction) rows
-#' @param mu1 Expected value of the mean of variable x
-#' @param sd1 Expected value of the standard deviation of variable x
-#' @param type Either "normal" or "lognormal"
+#' @param mu1 Mean of variable x (on log scale if type = "log_norm")
+#' @param sd1 Standard deviation of variable x (on log scale if type = "log_norm")
+#' @param type The distributions of the two variables (columns). If "norm_norm"
+#' both are normally distributed, if "log_log" both are lognormally distributed,
+#' if type = "log_norm" x will be lognormally distributed and y standard normal.
 getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
-                           type = "normal") {
+                           type = "norm_norm") {
     if (sum(is.na(c(rho_sub, fraction))) == 1) stop("Specify both rho_sub and fraction")
     # No differing subset
     if (is.na(rho_sub)) {
         theta <- acos(rho)                            # corresponding angle
-        if (type == "normal") {
+        if (type == "norm_norm") {
             x1    <- rnorm(N, mu1, sd1)                   # fixed given data
             x2    <- rnorm(N, 0, 1)                   # new random data
-        } else if (type == "lognormal") {
-            x1    <- log(rnorm(N, mu1, sd1))                   # fixed given data
-            x2    <- log(rnorm(N, 0, 1))                   # new random data
+        } else if (type == "log_log") {
+            x1    <- rlnorm(N, mu1, sd1)                   # fixed given data
+            x2    <- rlnorm(N, 0, 1)                   # new random data
+        } else if (type == "log_norm") {
+            x1    <- rlnorm(N, mu1, sd1)                   # fixed given data
+            x2    <- rnorm(N, 0, 1)                   # new random data
+        } else {
+            stop("Unknown type")
         }
         X     <- cbind(x1, x2)                        # matrix
         Xctr  <- scale(X, center=TRUE, scale=FALSE)   # centered columns (mean 0)
@@ -80,8 +87,8 @@ getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA
         # Different subset
         n_subset <- round(N * fraction)
         n_nonsubset <- N - n_subset
-        full_sample <- getBiCop_exact(N = n_nonsubset, rho = rho)
-        subset <- getBiCop_exact(N = n_subset, rho = rho_sub)
+        full_sample <- getBiCop_exact(N = n_nonsubset, rho = rho, type = type)
+        subset <- getBiCop_exact(N = n_subset, rho = rho_sub, type = type)
         df <- rbind(subset, full_sample)
         return(df)
     }

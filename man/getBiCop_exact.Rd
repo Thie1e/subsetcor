@@ -4,16 +4,28 @@
 \alias{getBiCop_exact}
 \title{Simulate bivariate normally distributed data with specified correlation, mean and sd}
 \usage{
-getBiCop_exact(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA)
+getBiCop_exact(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
+  type = "norm_norm")
 }
 \arguments{
 \item{N}{Sample size}
 
-\item{rho}{True correlation coefficient in the sample}
+\item{rho}{True correlation coefficient in the sample if rho_sub is not given,
+otherwise rho is the correlation in the rest of the sample that does not belong
+to the subset}
 
-\item{mu1}{Expected value of the mean of variable x}
+\item{rho_sub}{Correlation in the subset}
 
-\item{sd1}{Expected value of the standard deviation of variable x}
+\item{mu1}{Mean of variable x (on log scale if type = "log_norm")}
+
+\item{sd1}{Standard deviation of variable x (on log scale if type = "log_norm")}
+
+\item{fraction}{Fraction of the returned data.frame that belongs to the subset.
+The subset consists of the first round(N * fraction) rows}
+
+\item{type}{The distributions of the two variables (columns). If "norm_norm"
+both are normally distributed, if "log_log" both are lognormally distributed,
+if type = "log_norm" x will be lognormally distributed and y standard normal.}
 }
 \description{
 The correlation between x and y will be exactly rho.
