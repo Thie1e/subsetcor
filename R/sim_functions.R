@@ -54,22 +54,22 @@ getBiCop_indep <- function(N, mu1 = 0, mu2 = 0, sd1 = 1, sd2 = 1) {
 #' both are normally distributed, if "log_log" both are lognormally distributed,
 #' if type = "log_norm" x will be lognormally distributed and y standard normal.
 getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
-                           type = "norm_norm") {
+                           distribution = "norm_norm") {
     if (sum(is.na(c(rho_sub, fraction))) == 1) stop("Specify both rho_sub and fraction")
     # No differing subset
     if (is.na(rho_sub)) {
         theta <- acos(rho)                            # corresponding angle
-        if (type == "norm_norm") {
+        if (distribution == "norm_norm") {
             x1    <- rnorm(N, mu1, sd1)                   # fixed given data
             x2    <- rnorm(N, 0, 1)                   # new random data
-        } else if (type == "log_log") {
+        } else if (distribution == "log_log") {
             x1    <- rlnorm(N, mu1, sd1)                   # fixed given data
             x2    <- rlnorm(N, 0, 1)                   # new random data
-        } else if (type == "log_norm") {
+        } else if (distribution == "log_norm") {
             x1    <- rlnorm(N, mu1, sd1)                   # fixed given data
             x2    <- rnorm(N, 0, 1)                   # new random data
         } else {
-            stop("Unknown type")
+            stop("Unknown distribution")
         }
         X     <- cbind(x1, x2)                        # matrix
         Xctr  <- scale(X, center=TRUE, scale=FALSE)   # centered columns (mean 0)
@@ -87,8 +87,8 @@ getBiCop_exact <- function(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA
         # Different subset
         n_subset <- round(N * fraction)
         n_nonsubset <- N - n_subset
-        full_sample <- getBiCop_exact(N = n_nonsubset, rho = rho, type = type)
-        subset <- getBiCop_exact(N = n_subset, rho = rho_sub, type = type)
+        full_sample <- getBiCop_exact(N = n_nonsubset, rho = rho, distribution = distribution)
+        subset <- getBiCop_exact(N = n_subset, rho = rho_sub, distribution = distribution)
         df <- rbind(subset, full_sample)
         return(df)
     }
@@ -224,18 +224,21 @@ makeSteps <- function(nmax, stepPerc = 0.01, initialSamplesize = 10,
 #'
 #' @param N (integer) Size of the full sample
 #' @param fraction Size of the subset as a percentage of the full set
-#' @param distribution One of "normal" or "nonnormal". The type of distribution the
-#' variables are simulated from. In case of "nonnormal" the skewness and kurtosis
-#' can deviate from a normal distribution
+#' @param distribution One of "norm_norm", "log_norm" or "log_log". Refers to
+#' the "type" argument in getBiCop_exact().
 #' @param repetitions The simulation will be repeated this many times
-#' @param skew1 Skewness of the distribution of x
-#' @param skew2 Skewness of the distribution of y
-#' @param kurtosis1 Kurtosis of the distribution of x
-#' @param kurtosis2 Kurtosis of the distribution of y
-run_sim_fisher <- function(N, fraction, rho = 0, rho_sub = NA, distribution = "normal",
-                          kurtosis1 = 1, kurtosis2 = 1, skew1 = 1, skew2 = 1,
-                          repetitions = 100, progress_bar = T, summarize = F) {
-    stopifnot(distribution %in% c("normal", "nonnormal"))
+#' @param test "z" for Fisher's z transformation and p-values and confidence
+#' intervals based on normal theory. "permutation" for running a permutation
+#' test
+#' @param permuttype "simple" or "studentized"
+#' @param n_permut Number of permutations for the permutation tests
+run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = "norm_norm",
+                           test = "z", permuttype = "simple", n_permut = 1000,
+                           repetitions = 100, progress_bar = T) {
+    require(doRNG)
+    stopifnot(distribution %in% c("norm_norm", "log_norm", "log_log"))
+    stopifnot(permuttype %in% c("simple", "studentized"))
+    stopifnot(test %in% c("z", "permutation"))
     stopifnot(repetitions > 0 & length(repetitions) == 1)
     repetitions = round(repetitions)
     stopifnot(fraction <= 1 & fraction > 0)
@@ -244,219 +247,182 @@ run_sim_fisher <- function(N, fraction, rho = 0, rho_sub = NA, distribution = "n
     # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
     #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher")
     if (progress_bar) {
-        require(tcltk)
         pb <- txtProgressBar(max=repetitions, style=3)
         progress <- function(n) setTxtProgressBar(pb, n)
         opts <- list(progress=progress)
     } else opts = NULL
     stats <- foreach(i = 1:repetitions,
                      # .export = exportfuncs,
-                     .options.redis = list(chunkSize = 5, ftinterval = 100),
-                     .options.snow = opts, .packages = c("e1071", "subsetcor")) %dorng% {
-        if (is.na(rho_sub)) {
-            if (distribution == "normal") {
-                dat <- getBiCop(N = N, rho = rho)
-            } else if (distribution == "nonnormal") {
-                dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
-                                       sd1 = 1, sd2 = 1,
-                                       kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
-                                       skew1 = skew1, skew2 = skew2)
+                     .options.redis = list(chunkSize = 20, ftinterval = 100),
+                     .options.snow = opts, .packages = c("e1071", "subsetcor")) %dorng%
+        {
+            dat <- getBiCop_exact(N = N, rho = rho, rho_sub = rho_sub,
+                            distribution = distribution, fraction = fraction)
+            # Als Test (für den Output) skew und kurtosis einer Variablen
+            tempkurtosis <- kurtosis(dat$x)
+            tempskew <- skewness(dat$x)
+            #
+            n_full <- nrow(dat)
+            n_subset <- round(n_full * fraction)
+            if (is.na(rho_sub)) {
+                correlations <- sim_subcor(dat = dat, fraction = fraction)
+            } else {
+                correlations <- list()
+                correlations$cor_full <- cor(dat)[2, 1]
+                correlations$cor_subset <- cor(dat[1:n_subset, ])[2, 1]
+                correlations$inSubset <- 1:n_subset
             }
-        } else {
-            if (distribution == "normal") {
-                dat <- getBiCop(N = N, rho = rho, rho_sub = rho_sub, fraction = fraction)
-            } else if (distribution == "nonnormal") {
-                dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
-                                       sd1 = 1, sd2 = 1,
-                                       kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
-                                       skew1 = skew1, skew2 = skew2)
+            actual_cor <- correlations$cor_full
+            test_res <- list()
+            if (test == "z") {
+                ci95 <- ci_cor_fisher(alpha = 0.05, rho = actual_cor, n = n_subset, Npop = n_full)
+                test_res$ci95_upper <- ci95["cor_ci_upper"]
+                test_res$ci95_lower <- ci95["cor_ci_lower"]
+                ci99 <- ci_cor_fisher(alpha = 0.01, rho = actual_cor, n = n_subset, Npop = n_full)
+                test_res$ci99_upper <- ci99["cor_ci_upper"]
+                test_res$ci99_lower <- ci99["cor_ci_lower"]
+                test_res$p_greater <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
+                                            n = n_subset,
+                                            alternative = "greater", Npop = n_full)
+                test_res$p_less <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
+                                         n = n_subset,
+                                         alternative = "less", Npop = n_full)
+                test_res$p_twosided <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
+                                             n = n_subset,
+                                             alternative = "two.sided", Npop = n_full)
+                test_res <- data.frame(test_res, row.names = NULL)
+            } else if (test == "permutation") {
+                test_res <- inference_cor_perm(x = dat$x, y = dat$y, r = correlations$cor_subset,
+                                                     fraction = fraction, type = permuttype,
+                                                     n_permut = n_permut,
+                                                     inSubset = correlations$inSubset)
+                test_res <- data.frame(test_res, row.names = NULL)
             }
+            test_res$n_full <- n_full
+            test_res$n_subset <- n_subset
+            test_res$cor_subset <- correlations$cor_subset
+            test_res$cor_full <- correlations$cor_full
+            test_res$skew <- tempskew
+            test_res$kurtosis <- tempkurtosis
+            return(test_res)
         }
-        # Als Test (für den Output) skew und kurtosis einer Variablen
-        tempkurtosis <- kurtosis(dat$x)
-        tempskew <- skewness(dat$x)
-        #
-        n_full <- nrow(dat)
-        n_subset <- round(n_full * fraction)
-        if (is.na(rho_sub)) {
-            correlations <- sim_subcor(dat = dat, fraction = fraction)
-        } else {
-            correlations <- list()
-            correlations$cor_full <- cor(dat[(n_subset + 1):n_full, ])[2, 1]
-            correlations$cor_subset <- cor(dat[1:n_subset, ])[2, 1]
-            correlations$inSubset <- 1:n_subset
-        }
-        actual_cor <- correlations$cor_full
-        ci95 <- ci_cor_fisher(alpha = 0.05, rho = actual_cor, n = n_subset, Npop = n_full)
-        ci95_upper <- ci95["cor_ci_upper"]
-        ci95_lower <- ci95["cor_ci_lower"]
-        ci99 <- ci_cor_fisher(alpha = 0.01, rho = actual_cor, n = n_subset, Npop = n_full)
-        ci99_upper <- ci99["cor_ci_upper"]
-        ci99_lower <- ci99["cor_ci_lower"]
-        pgreater <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
-                                    n = n_subset,
-                                    alternative = "greater", Npop = n_full)
-        pless <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
-                                 n = n_subset,
-                                 alternative = "less", Npop = n_full)
-        ptwosided <- pval_cor_fisher(r = correlations$cor_subset, rho = correlations$cor_full,
-                                     n = n_subset,
-                                     alternative = "two.sided", Npop = n_full)
-        res <- c(n_full = n_full,
-                 n_subset = n_subset,
-                 rho = rho, rho_sub = rho_sub,
-                 cor_subset = correlations$cor_subset,
-                 cor_full = correlations$cor_full,
-                 fraction = fraction,
-                 ci95 = ci95_upper, ci95 = ci95_lower,
-                 ci99 = ci99_upper, ci99 = ci99_lower,
-                 pless = pless, pgreater = pgreater, ptwosided = ptwosided,
-                 skew = tempskew, kurtosis = tempkurtosis)
-    }
     if (progress_bar) close(pb)
     stats <- do.call(rbind, stats)
     stats <- data.frame(stats)
-    if (summarize) {
-        return(data.frame(
-            inCI95 = stats$cor_subset >= stats$ci95.cor_ci_lower &
-                stats$cor_subset <= stats$ci95.cor_ci_upper,
-            inCI99 = stats$cor_subset >= stats$ci99.cor_ci_lower &
-                stats$cor_subset <= stats$ci99.cor_ci_upper,
-            pgreater_frac_significant = mean(stats$pgreater <= 0.05),
-            pless_frac_significant = mean(stats$pless <= 0.05),
-            ptwosided_frac_significant = mean(stats$ptwosided <= 0.05),
-            skew = stats$skew, kurtosis = stats$kurtosis,
-            cor_full = stats$cor_full, cor_subset = stats$cor_subset,
-            n_full = stats$n_full, n_subset = stats$n_subset,
-            rho = stats$rho, rho_sub = rho_sub, fraction = stats$fraction
-        ))
-    } else {
-        return(data.frame(
-            CI95_lower = stats$ci95.cor_ci_lower,
-            CI95_upper = stats$ci95.cor_ci_upper,
-            CI99_lower = stats$ci99.cor_ci_lower,
-            CI99_upper = stats$ci99.cor_ci_upper,
-            pgreater = stats$pgreater,
-            pless = stats$pless,
-            ptwosided = stats$ptwosided,
-            skew = stats$skew, kurtosis = stats$kurtosis,
-            cor_full = stats$cor_full, cor_subset = stats$cor_subset,
-            n_full = stats$n_full, n_subset = stats$n_subset,
-            rho = stats$rho, rho_sub = stats$rho_sub, fraction = stats$fraction
-        ))
-    }
+    stats$rho <- rho
+    stats$rho_sub <- rho_sub
+    stats$fraction <- fraction
+    return(stats)
 }
 
 
-run_sim_permut <- function(N, fraction, rho = 0, rho_sub = NA, distribution = "normal",
-                           permuttype = "simple", n_permut = 1000,
-                           kurtosis1 = 1, kurtosis2 = 1, skew1 = 1, skew2 = 1,
-                           repetitions = 100, progress_bar = T, summarize = F) {
-    stopifnot(distribution %in% c("normal", "nonnormal"))
-    stopifnot(repetitions > 0 & length(repetitions) == 1)
-    repetitions = round(repetitions)
-    stopifnot(fraction <= 1 & fraction > 0)
-    stopifnot(rho <= 1 & rho > -1)
-    require(foreach)
-    # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
-    #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher",
-    #                  "inference_cor_perm", "permute_ecdf", "test_cor_perm_student")
-    if (progress_bar) {
-        require(tcltk)
-        pb <- txtProgressBar(max=repetitions, style=3)
-        progress <- function(n) setTxtProgressBar(pb, n)
-        opts <- list(progress=progress)
-    } else opts = NULL
-    stats <- foreach(i = 1:repetitions,
-                     # .export = exportfuncs,
-                     .options.redis = list(chunkSize = 5, ftinterval = 100),
-                     .options.snow = opts, .packages = c("e1071", "subsetcor")) %dorng% {
-        if (is.na(rho_sub)) {
-            if (distribution == "normal") {
-                dat <- getBiCop(N = N, rho = rho)
-            } else if (distribution == "nonnormal") {
-                dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
-                                       sd1 = 1, sd2 = 1,
-                                       kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
-                                       skew1 = skew1, skew2 = skew2)
-            }
-        } else {
-            if (distribution == "normal") {
-                dat <- getBiCop(N = N, rho = rho, rho_sub = rho_sub, fraction = fraction)
-            } else if (distribution == "nonnormal") {
-                dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
-                                       sd1 = 1, sd2 = 1,
-                                       kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
-                                       skew1 = skew1, skew2 = skew2)
-            }
-        }
-        # Als Test (für den Output) skew und kurtosis einer Variablen
-        tempkurtosis <- kurtosis(dat$x)
-        tempskew <- skewness(dat$x)
-        #
-        n_full <- nrow(dat)
-        n_subset <- round(n_full * fraction)
-        if (is.na(rho_sub)) {
-            correlations <- sim_subcor(dat = dat, fraction = fraction)
-        } else {
-            correlations <- list()
-            correlations$cor_full <- cor(dat[(n_subset + 1):n_full, ])[2, 1]
-            correlations$cor_subset <- cor(dat[1:n_subset, ])[2, 1]
-            correlations$inSubset <- 1:n_subset
-        }
-        actual_cor <- correlations$cor_full
-        pvals_cis_perm <- inference_cor_perm(x = dat$x, y = dat$y, r = correlations$cor_subset,
-                                             fraction = fraction, type = permuttype,
-                                             n_permut = n_permut,
-                                             inSubset = correlations$inSubset)
-        res <- c(n_full = n_full,
-                 n_subset = n_subset,
-                 rho = rho, rho_sub = rho_sub,
-                 cor_subset = correlations$cor_subset,
-                 cor_full = correlations$cor_full,
-                 fraction = fraction,
-                 ci95_upper = pvals_cis_perm$ci95_upper,
-                 ci95_lower = pvals_cis_perm$ci95_lower,
-                 ci99_upper = pvals_cis_perm$ci99_upper,
-                 ci99_lower = pvals_cis_perm$ci99_lower,
-                 p_less = pvals_cis_perm$p_less,
-                 p_greater = pvals_cis_perm$p_greater,
-                 p_twosided = pvals_cis_perm$p_twosided,
-                 skew = tempskew, kurtosis = tempkurtosis)
-    }
-    if (progress_bar) close(pb)
-    stats <- do.call(rbind, stats)
-    stats <- data.frame(stats)
-    if (summarize) {
-        # Summarize results
-        cor_diffs <- stats$cor_subset - stats$cor_full
-        inCI95 = cor_diffs >= stats$ci95_lower &
-            cor_diffs <= stats$ci95_upper
-        inCI99 = cor_diffs >= stats$ci99_lower &
-            cor_diffs <= stats$ci99_upper
-        return(data.frame(inCI95 = mean(inCI95),
-                          inCI99 = mean(inCI99),
-                          pgreater_frac_significant = mean(stats$p_greater <= 0.05),
-                          pless_frac_significant = mean(stats$p_less <= 0.05),
-                          ptwosided_frac_significant = mean(stats$p_twosided <= 0.05),
-                          skew = stats$skew, kurtosis = stats$kurtosis,
-                          cor_full = stats$cor_full, cor_subset = stats$cor_subset,
-                          n_full = stats$n_full, n_subset = stats$n_subset,
-                          rho = stats$rho, rho_sub = stats$rho_sub,
-                          fraction = stats$fraction))
-    } else {
-        return(data.frame(
-            CI95_lower = stats$ci95_lower,
-            CI95_upper = stats$ci95_upper,
-            CI99_lower = stats$ci99_lower,
-            CI99_upper = stats$ci99_upper,
-            pgreater = stats$p_greater,
-            pless = stats$p_less,
-            ptwosided = stats$p_twosided,
-            skew = stats$skew, kurtosis = stats$kurtosis,
-            cor_full = stats$cor_full, cor_subset = stats$cor_subset,
-            n_full = stats$n_full, n_subset = stats$n_subset,
-            rho = stats$rho, rho_sub = stats$rho_sub, fraction = stats$fraction
-        ))
-    }
-}
+# run_sim_permut <- function(N, fraction, rho = 0, rho_sub = NA, distribution = "norm_norm",
+#                            permuttype = "simple", n_permut = 1000,
+#                            repetitions = 100, progress_bar = T) {
+#     stopifnot(distribution %in% c("norm_norm", "log_norm", "log_log"))
+#     stopifnot(repetitions > 0 & length(repetitions) == 1)
+#     repetitions = round(repetitions)
+#     stopifnot(fraction <= 1 & fraction > 0)
+#     stopifnot(rho <= 1 & rho > -1)
+#     require(foreach)
+#     # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
+#     #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher",
+#     #                  "inference_cor_perm", "permute_ecdf", "test_cor_perm_student")
+#     if (progress_bar) {
+#         pb <- txtProgressBar(max=repetitions, style=3)
+#         progress <- function(n) setTxtProgressBar(pb, n)
+#         opts <- list(progress=progress)
+#     } else opts = NULL
+#     stats <- foreach(i = 1:repetitions,
+#                      # .export = exportfuncs,
+#                      .options.redis = list(chunkSize = 20, ftinterval = 100),
+#                      .options.snow = opts, .packages = c("e1071", "subsetcor")) %dorng% {
+#         if (is.na(rho_sub)) {
+#             if (distribution == "normal") {
+#                 dat <- getBiCop(N = N, rho = rho)
+#             } else if (distribution == "nonnormal") {
+#                 dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
+#                                        sd1 = 1, sd2 = 1,
+#                                        kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
+#                                        skew1 = skew1, skew2 = skew2)
+#             }
+#         } else {
+#             if (distribution == "normal") {
+#                 dat <- getBiCop(N = N, rho = rho, rho_sub = rho_sub, fraction = fraction)
+#             } else if (distribution == "nonnormal") {
+#                 dat <- getBiCop_nonnor(N = N, rho = rho, mu1 = 0, mu2 = 0,
+#                                        sd1 = 1, sd2 = 1,
+#                                        kurtosis1 = kurtosis1, kurtosis2 = kurtosis2,
+#                                        skew1 = skew1, skew2 = skew2)
+#             }
+#         }
+#         # Als Test (für den Output) skew und kurtosis einer Variablen
+#         tempkurtosis <- kurtosis(dat$x)
+#         tempskew <- skewness(dat$x)
+#         #
+#         n_full <- nrow(dat)
+#         n_subset <- round(n_full * fraction)
+#         if (is.na(rho_sub)) {
+#             correlations <- sim_subcor(dat = dat, fraction = fraction)
+#         } else {
+#             correlations <- list()
+#             correlations$cor_full <- cor(dat[(n_subset + 1):n_full, ])[2, 1]
+#             correlations$cor_subset <- cor(dat[1:n_subset, ])[2, 1]
+#             correlations$inSubset <- 1:n_subset
+#         }
+#         actual_cor <- correlations$cor_full
+#         pvals_cis_perm <- inference_cor_perm(x = dat$x, y = dat$y, r = correlations$cor_subset,
+#                                              fraction = fraction, type = permuttype,
+#                                              n_permut = n_permut,
+#                                              inSubset = correlations$inSubset)
+#         res <- c(n_full = n_full,
+#                  n_subset = n_subset,
+#                  rho = rho, rho_sub = rho_sub,
+#                  cor_subset = correlations$cor_subset,
+#                  cor_full = correlations$cor_full,
+#                  fraction = fraction,
+#                  ci95_upper = pvals_cis_perm$ci95_upper,
+#                  ci95_lower = pvals_cis_perm$ci95_lower,
+#                  ci99_upper = pvals_cis_perm$ci99_upper,
+#                  ci99_lower = pvals_cis_perm$ci99_lower,
+#                  p_less = pvals_cis_perm$p_less,
+#                  p_greater = pvals_cis_perm$p_greater,
+#                  p_twosided = pvals_cis_perm$p_twosided,
+#                  skew = tempskew, kurtosis = tempkurtosis)
+#     }
+#     if (progress_bar) close(pb)
+#     stats <- do.call(rbind, stats)
+#     stats <- data.frame(stats)
+#     if (summarize) {
+#         # Summarize results
+#         cor_diffs <- stats$cor_subset - stats$cor_full
+#         inCI95 = cor_diffs >= stats$ci95_lower &
+#             cor_diffs <= stats$ci95_upper
+#         inCI99 = cor_diffs >= stats$ci99_lower &
+#             cor_diffs <= stats$ci99_upper
+#         return(data.frame(inCI95 = mean(inCI95),
+#                           inCI99 = mean(inCI99),
+#                           pgreater_frac_significant = mean(stats$p_greater <= 0.05),
+#                           pless_frac_significant = mean(stats$p_less <= 0.05),
+#                           ptwosided_frac_significant = mean(stats$p_twosided <= 0.05),
+#                           skew = stats$skew, kurtosis = stats$kurtosis,
+#                           cor_full = stats$cor_full, cor_subset = stats$cor_subset,
+#                           n_full = stats$n_full, n_subset = stats$n_subset,
+#                           rho = stats$rho, rho_sub = stats$rho_sub,
+#                           fraction = stats$fraction))
+#     } else {
+#         return(data.frame(
+#             CI95_lower = stats$ci95_lower,
+#             CI95_upper = stats$ci95_upper,
+#             CI99_lower = stats$ci99_lower,
+#             CI99_upper = stats$ci99_upper,
+#             pgreater = stats$p_greater,
+#             pless = stats$p_less,
+#             ptwosided = stats$p_twosided,
+#             skew = stats$skew, kurtosis = stats$kurtosis,
+#             cor_full = stats$cor_full, cor_subset = stats$cor_subset,
+#             n_full = stats$n_full, n_subset = stats$n_subset,
+#             rho = stats$rho, rho_sub = stats$rho_sub, fraction = stats$fraction
+#         ))
+#     }
+# }

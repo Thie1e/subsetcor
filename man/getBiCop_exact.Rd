@@ -5,7 +5,7 @@
 \title{Simulate bivariate normally distributed data with specified correlation, mean and sd}
 \usage{
 getBiCop_exact(N, rho, rho_sub = NA, mu1 = 0, sd1 = 1, fraction = NA,
-  type = "norm_norm")
+  distribution = "norm_norm")
 }
 \arguments{
 \item{N}{Sample size}
