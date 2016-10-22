@@ -243,8 +243,8 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
     stopifnot(test %in% c("z", "permutation"))
     stopifnot(repetitions > 0 & length(repetitions) == 1)
     repetitions = round(repetitions)
-    stopifnot(fraction <= 1 & fraction > 0)
-    stopifnot(rho <= 1 & rho > -1)
+    stopifnot(fraction < 1 & fraction > 0)
+    stopifnot(rho <= 1 & rho >= -1)
     require(foreach)
     # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
     #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher")
