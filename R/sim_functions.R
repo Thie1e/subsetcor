@@ -246,8 +246,8 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
     stopifnot(fraction < 1 & fraction > 0)
     stopifnot(rho <= 1 & rho >= -1)
     require(foreach)
-    # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
-    #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher")
+    # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "se_z_finite",
+    #                  "ztor", "se_z", "E_z", "ci_cor_fisher", "pval_cor_fisher")
     if (progress_bar) {
         pb <- txtProgressBar(max=repetitions, style=3)
         progress <- function(n) setTxtProgressBar(pb, n)
@@ -294,7 +294,7 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
                                              alternative = "two.sided", Npop = n_full)
                 test_res <- data.frame(test_res, row.names = NULL)
             } else if (test == "permutation") {
-                test_res <- inference_cor_perm(x = dat$x, y = dat$y, r = correlations$cor_subset,
+                test_res <- inference_cor_perm(x = dat$x, y = dat$y,
                                                      fraction = fraction, type = permuttype,
                                                      n_permut = n_permut,
                                                      inSubset = correlations$inSubset)
@@ -327,8 +327,8 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
 #     stopifnot(fraction <= 1 & fraction > 0)
 #     stopifnot(rho <= 1 & rho > -1)
 #     require(foreach)
-#     # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "Sd_z_finite",
-#     #                  "ztor", "Sd_z", "E_z", "ci_cor_fisher", "pval_cor_fisher",
+#     # exportfuncs <- c("sim_subcor", "getBiCop", "getBiCop_nonnor", "rtoz", "se_z_finite",
+#     #                  "ztor", "se_z", "E_z", "ci_cor_fisher", "pval_cor_fisher",
 #     #                  "inference_cor_perm", "permute_ecdf", "test_cor_perm_student")
 #     if (progress_bar) {
 #         pb <- txtProgressBar(max=repetitions, style=3)
