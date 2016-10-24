@@ -19,7 +19,7 @@ dcorr <- function(r, n, rho) {
 #'
 #' Uses the hypergeometric function 2F1 from the gsl package.
 #' Calculates the distribution directly as the integral of dcorr().
-#' @param r Value of the correlation coefficient
+#' @param q Value of the correlation coefficient
 #' @param n Sample size
 #' @param rho True correlation in the population
 #' @param lower.tail logical; if TRUE (default), probabilities are P[X ≤ x] otherwise, P[X > x].
@@ -67,6 +67,18 @@ moments_R_odd <- function(rho, n, k, maxterms = 1000) {
     return(list(value = moment, terms = terms))
 }
 
+#' Moment functions for the sample correlation coefficient based on the solutions
+#' of Anderson (via Provost, 2015)
+#'
+#' Stops the calculation of the sum term as soon as an infinite value is
+#' returned, which may happen very soon or immediately for large n. In that
+#' case the results are not reliable.
+#'
+#' @param rho True correlation coefficient in the population
+#' @param n Sample size
+#' @param k Moment number
+#' @maxterm Maximum number of terms of the infinite sum that the function
+#' will try to calculate
 moments_R_even <- function(rho, n, k, maxterms = 1000) {
     if (k %% 2 == 1) stop("k has to be even")
     i <- 0
@@ -100,6 +112,7 @@ E_r_integral <- function(n, rho) {
 #' Variance of sample correlation coefficient
 #'
 #' Calculated as the integral of (r - E(r)) times the distribution function dcorr in [-1, 1].
+#' Thus based on the closed form solution in Provost (2015).
 #' @param n Sample size
 #' @param rho True correlation in the population
 var_r_integral <- function(n, rho) {
@@ -153,32 +166,94 @@ ci_cor <- function(alpha, rho, n) {
 
 #' Functions for Fisher's z-transformation
 #'
+#' Convert a sample correlation coefficient (r) to Fisher's z or the other way
+#' around, compute the expected value of z (E_z), compute the standard error of z
+#' (se_z), and the standard error of z with a correction for finite samples (se_z_finite) with
+#' Npop being the size of the full sample.
+#'
 #' @param r Sample correlation coefficient
 #' @param rho Population correlation coefficient
 #' @param n Sample size
 #' @param Npop Population size in case of finite populations, e.g. when a subset was
 #' extracted from a sample
+#' @seealso \code{\link{rtoz}}, \code{\link{ztor}}, \code{\link{E_z}}, \code{\link{se_z}}, \code{\link{se_z_finite}}
 rtoz <- function(r) 0.5 * log((1 + r) / (1 - r))
+
+#' Functions for Fisher's z-transformation
+#'
+#' Convert a sample correlation coefficient (r) to Fisher's z or the other way
+#' around, compute the expected value of z (E_z), compute the standard error of z
+#' (se_z), and the standard error of z with a correction for finite samples (se_z_finite) with
+#' Npop being the size of the full sample.
+#'
+#' @param r Sample correlation coefficient
+#' @param rho Population correlation coefficient
+#' @param n Sample size
+#' @param Npop Population size in case of finite populations, e.g. when a subset was
+#' extracted from a sample
+#' @seealso \code{\link{rtoz}}, \code{\link{ztor}}, \code{\link{E_z}}, \code{\link{se_z}}, \code{\link{se_z_finite}}
 ztor <- function(z) (exp(2 * z) - 1) / (exp(2 * z) + 1)
+
+#' Functions for Fisher's z-transformation
+#'
+#' Convert a sample correlation coefficient (r) to Fisher's z or the other way
+#' around, compute the expected value of z (E_z), compute the standard error of z
+#' (se_z), and the standard error of z with a correction for finite samples (se_z_finite) with
+#' Npop being the size of the full sample.
+#'
+#' @param r Sample correlation coefficient
+#' @param rho Population correlation coefficient
+#' @param n Sample size
+#' @param Npop Population size in case of finite populations, e.g. when a subset was
+#' extracted from a sample
+#' @seealso \code{\link{rtoz}}, \code{\link{ztor}}, \code{\link{E_z}}, \code{\link{se_z}}, \code{\link{se_z_finite}}
 E_z <- function(rho) 0.5 * log((1 + rho) / (1 - rho))
-Sd_z <- function(n) 1 / (sqrt(n - 3))
-Sd_z_finite <- function(Npop, n) Sd_z(n) * sqrt((Npop - n) / (Npop - 1))
+
+#' Functions for Fisher's z-transformation
+#'
+#' Convert a sample correlation coefficient (r) to Fisher's z or the other way
+#' around, compute the expected value of z (E_z), compute the standard error of z
+#' (se_z), and the standard error of z with a correction for finite samples (se_z_finite) with
+#' Npop being the size of the full sample.
+#'
+#' @param r Sample correlation coefficient
+#' @param rho Population correlation coefficient
+#' @param n Sample size
+#' @param Npop Population size in case of finite populations, e.g. when a subset was
+#' extracted from a sample
+#' @seealso \code{\link{rtoz}}, \code{\link{ztor}}, \code{\link{E_z}}, \code{\link{se_z}}, \code{\link{se_z_finite}}
+se_z <- function(n) 1 / (sqrt(n - 3))
+
+#' Functions for Fisher's z-transformation
+#'
+#' Convert a sample correlation coefficient (r) to Fisher's z or the other way
+#' around, compute the expected value of z (E_z), compute the standard error of z
+#' (se_z), and the standard error of z with a correction for finite samples (se_z_finite) with
+#' Npop being the size of the full sample.
+#'
+#' @param r Sample correlation coefficient
+#' @param rho Population correlation coefficient
+#' @param n Sample size
+#' @param Npop Population size in case of finite populations, e.g. when a subset was
+#' extracted from a sample
+#' @seealso \code{\link{rtoz}}, \code{\link{ztor}}, \code{\link{E_z}}, \code{\link{se_z}}, \code{\link{se_z_finite}}
+se_z_finite <- function(Npop, n) se_z(n) * sqrt((Npop - n) / (Npop - 1))
 
 #' Confidence interval of sample correlation coefficient (also in finite populations)
 #'
 #' Based on Fisher's z-transformation and a correction of the standard deviation for
 #' finite samples: (Npop - n) / (Npop - 1)
 #'
-#' @param alpha confidence level
 #' @param rho population correlation coefficient
 #' @param n sample size
 #' @param Npop Population size
-ci_cor_fisher <- function(alpha, rho, n, Npop) {
+#' @param alpha confidence level
+ci_cor_fisher <- function(rho, n, Npop, alpha = 0.05) {
     z <- rtoz(rho)
     if (Npop == Inf) {
-        sd_z <- Sd_z(n = n)
+        sd_z <- se_z(n = n)
     } else {
-        sd_z <- Sd_z_finite(Npop = Npop, n = n)
+        sd_z <- se_z_finite(Npop = Npop, n = n)
     }
     # ci_upper <- z + qt(1 - alpha / 2, df = n - 1) * sd_z
     ci_upper <- z + qnorm(1 - alpha / 2) * sd_z
@@ -205,7 +280,7 @@ ci_cor_fisher <- function(alpha, rho, n, Npop) {
 pval_cor_fisher <- function(r, rho, n, Npop, alternative = "two.sided") {
     if (!(alternative %in% c("greater", "less", "two.sided"))) stop("alternative != greater, less or two.sided")
     r_z <- rtoz(r)
-    sd_z <- Sd_z_finite(Npop, n)
+    sd_z <- se_z_finite(Npop, n)
     if (alternative == "greater") {
         # p <- pnorm(q = r_z, mean = E_z(rho), sd = sd_z, lower.tail = F)
         # Das gleiche schöner:
@@ -221,32 +296,7 @@ pval_cor_fisher <- function(r, rho, n, Npop, alternative = "two.sided") {
     }
 }
 
-#' Combined function for p-value and CI of a sample correlation coefficient
-#' based on Fisher's z-transformation
-#'
-#' Based on Fisher's z-transformation and a correction of the standard deviation for
-#' finite samples: (Npop - n) / (Npop - 1)
-#' Calculates probability of observing a sample correlation coefficient r given
-#' a sample size n, a population size Npop and the population correlation coefficient rho
-#' as the p-value and also outputs the confidence interval from ci_cor_fisher().
-#' @param alpha confidence level for confidence interval
-#' @param rho population correlation coefficient
-#' @param n sample size
-#' @param Npop Population size
-#' @param alternative For p-value: a character string specifying the alternative hypothesis,
-#'  must be one of "two.sided" (default), "greater" or "less"
-# inference_cor_fisher <- function(r, rho, alpha = 0.05, n, Npop) {
-#     pval_greater <- pval_cor_fisher(r = r, rho = rho, n = n, Npop = Npop, alternative = "greater")
-#     pval_less <- pval_cor_fisher(r = r, rho = rho, n = n, Npop = Npop, alternative = "less")
-#     pval_twosided <- pval_cor_fisher(r = r, rho = rho, n = n, Npop = Npop, alternative = "two.sided")
-#     ci <- ci_cor_fisher(alpha = alpha, rho = rho, n = n, Npop = Npop)
-#     return(data.frame(p_greater = pval_greater, p_less = pval_less,
-#                       p_two.sided = pval_twosided, ci_cor_upper = ci["cor_ci_upper"],
-#                       ci_cor_lower = ci["cor_ci_lower"], row.names = NULL))
-# }
-
-#' draw a permutation from the full sample with size n_subset
-#' save empirical distribution of cor_subset
+#' Draw a permutation from the full sample with size n_subset and save empirical distribution of cor_subset
 #'
 #' Confidence intervals can be derived using quantile()
 #' p-values of observed cor_subset can be derived using ecdf()
@@ -269,30 +319,29 @@ permute_ecdf <- function(x, y, fraction = NULL, n_subset = NULL, n_permut = 1000
     return(ecdf(cor_permute))
 }
 
-# ecdf_p <- permute_ecdf(full_data$x, full_data$y, fraction = fraction, n_permut = 1000)
-# subset_data <- full_data[1:round(nrow(full_data)*fraction),]
-# cor_diff = cor(full_data$x, full_data$y) - cor(subset_data$x, subset_data$y)
-# return(data.frame(cor_full = cor(full_data$x,full_data$y),
-#                   cor_subset = cor(subset_data$x,subset_data$y),
-#                   cor_diff = cor_diff,
-#                   ci99_lower = quantile(ecdf_p, 0.005),
-#                   ci99_upper = quantile(ecdf_p, 0.995),
-#                   ci95_lower = quantile(ecdf_p, 0.025),
-#                   ci95_upper = quantile(ecdf_p, 0.975),
-#                   pgreater = 1 - ecdf_p(cor_diff),
-#                   pless = ecdf_p(cor_diff),
-#                   ptwosided = 1 - ecdf_p(abs(cor_diff)) + ecdf_p(-abs(cor_diff))))
-
-
-inference_cor_perm <- function(x, y, r, fraction = NULL, type = "simple",
-                               n_permut = 1000, inSubset = NULL) {
+#' Calculate confidence intervals and p-value for a given subsample correlation
+#'
+#' Given a data set (x and y) and a vector that contains the row numbers of the
+#' observations that belong to the subset (inSubset) the functions runs n_permut permutations
+#' for determining 95% and 99% confidence intervals and the significance of the
+#' given subset correlation coefficient (r)
+#'
+#' @param x x variable (numeric vector)
+#' @param y y variable (numeric vector)
+#' @param type "simple" or "studentized" permutation test
+#' @param n_permut number of permutations for the permutation test
+#' @param inSubset integer vector of the row numbers of all observations that belong
+#' to the subset
+inference_cor_perm <- function(x, y, type = "simple", n_permut = 1000, inSubset = NULL) {
+    stopifnot(all(table(inSubset)) == 1)
     stopifnot(type %in% c("simple", "studentized"))
     stopifnot(length(x) == length(y))
     full_data <- data.frame(x = x, y = y)
     if (type == "simple") {
-        stopifnot(!(is.null(fraction)))
         stopifnot(r <= 1 & r >= -1)
+        fraction <- length(inSubset) / length(x)
         permutation_ecdf <- permute_ecdf(x = x, y = y, fraction = fraction, n_permut = 1000)
+        r <- cor(x[inSubset], y[inSubset])
         cor_diff = r - cor(full_data$x, full_data$y)
         p_greater = 1 - permutation_ecdf(cor_diff)
         p_less = permutation_ecdf(cor_diff)
@@ -429,7 +478,7 @@ test_cor_perm_student <- function(full_data, subset_data, n_permut = 1000) {
 
 
 # Als weiterer Vergleich zum studentisierten und simplen Permutationstest.
-# Diese Funktion permutiert das standardisierte Sample, optional mit
+# Diese Funktion permutiert das standardisierte Sample mit
 # an * (r2 - r1) als Teststatistik anstelle von (r2 - r1).
 test_cor_perm_sakaori <- function(full_data, subset_data, n_permut = 1000) {
     #   Function for standardization
@@ -477,25 +526,3 @@ test_cor_perm_sakaori <- function(full_data, subset_data, n_permut = 1000) {
                 ci95_lower = ci95_lower, ci95_upper = ci95_upper)
     return(res)
 }
-
-### Test der Funktion
-# temp_res <- mclapply(1:10000, mc.cores = 23, function(r) {
-#     temp1 <- getBiCop_exact(100, 0.5)
-#     temp2 <- getBiCop_nonnor(100, rho = 0.3)
-#     temp <- rbind(temp1, temp2)
-#     temptest_sakaori <- test_cor_perm_sakaori(full_data = temp, subset_data = temp[101:200, ])
-#     temptest_simple <- inference_cor_perm(x = temp$x, y = temp$y, r = cor(temp2)[1,2],
-#                                           fraction = 0.5, type = "simple", n_permut = 1000,
-#                                           inSubset = 101:200)
-#     return(tibble(sakaori_pts = temptest_sakaori$p_twosided,
-#                   simple_pts = temptest_simple$p_twosided))
-# })
-# temp_res <- unlist(temp_res)
-# hist(temp_res)
-# sum(temp_res < 0.05) / length(temp_res)
-
-###
-# Mit oder ohne an: Es macht keinen Unterschied, auch wenn temp1 und temp2,
-# also die Verteilungen des Subsets und des Rests des vollen Sets unterschiedlich
-# sind. Ohne an entspricht dieser Test dem simplen Permutationstest, nur dass
-# die Daten zuerst standardisiert werden.
