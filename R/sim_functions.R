@@ -254,6 +254,7 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
         opts <- list(progress=progress)
     } else opts = NULL
     stats <- foreach(i = 1:repetitions,
+                     .combine = rbind,
                      # .export = exportfuncs,
                      .options.redis = list(chunkSize = 20, ftinterval = 100),
                      .options.snow = opts, .packages = c("e1071", "subsetcor")) %dorng%
@@ -309,7 +310,7 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
             return(test_res)
         }
     if (progress_bar) close(pb)
-    stats <- do.call(rbind, stats)
+    # stats <- do.call(rbind, stats)
     stats <- data.frame(stats)
     stats$rho <- rho
     stats$rho_sub <- rho_sub
