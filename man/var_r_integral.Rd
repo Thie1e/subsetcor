@@ -13,5 +13,6 @@ var_r_integral(n, rho)
 }
 \description{
 Calculated as the integral of (r - E(r)) times the distribution function dcorr in [-1, 1].
+Thus based on the closed form solution in Provost (2015).
 }
 

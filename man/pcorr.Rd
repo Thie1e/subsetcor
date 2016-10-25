@@ -8,13 +8,13 @@ solution in Provost (2015)}
 pcorr(q, n, rho, lower.tail = TRUE)
 }
 \arguments{
+\item{q}{Value of the correlation coefficient}
+
 \item{n}{Sample size}
 
 \item{rho}{True correlation in the population}
 
 \item{lower.tail}{logical; if TRUE (default), probabilities are P[X ≤ x] otherwise, P[X > x].}
-
-\item{r}{Value of the correlation coefficient}
 }
 \description{
 Uses the hypergeometric function 2F1 from the gsl package.

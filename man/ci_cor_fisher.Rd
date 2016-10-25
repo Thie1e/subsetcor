@@ -4,16 +4,16 @@
 \alias{ci_cor_fisher}
 \title{Confidence interval of sample correlation coefficient (also in finite populations)}
 \usage{
-ci_cor_fisher(alpha, rho, n, Npop)
+ci_cor_fisher(rho, n, Npop, alpha = 0.05)
 }
 \arguments{
-\item{alpha}{confidence level}
-
 \item{rho}{population correlation coefficient}
 
 \item{n}{sample size}
 
 \item{Npop}{Population size}
+
+\item{alpha}{confidence level}
 }
 \description{
 Based on Fisher's z-transformation and a correction of the standard deviation for
