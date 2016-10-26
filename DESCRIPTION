@@ -1,7 +1,7 @@
 Package: subsetcor
 Type: Package
 Title: Test differences of correlations in subsets and run related simulation studies
-Version: 0.1.4
+Version: 0.1.7
 Author: Christian Thiele
 Maintainer: Christian Thiele <contme109@gmail.com>
 Description: This package is mainly concerned with differences of the correlation

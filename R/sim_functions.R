@@ -296,7 +296,7 @@ run_cor_sim <- function(N, fraction = NA, rho = 0, rho_sub = NA, distribution = 
                 test_res <- data.frame(test_res, row.names = NULL)
             } else if (test == "permutation") {
                 test_res <- inference_cor_perm(x = dat$x, y = dat$y,
-                                                     fraction = fraction, type = permuttype,
+                                                     type = permuttype,
                                                      n_permut = n_permut,
                                                      inSubset = correlations$inSubset)
                 test_res <- data.frame(test_res, row.names = NULL)

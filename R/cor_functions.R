@@ -338,7 +338,6 @@ inference_cor_perm <- function(x, y, type = "simple", n_permut = 1000, inSubset 
     stopifnot(length(x) == length(y))
     full_data <- data.frame(x = x, y = y)
     if (type == "simple") {
-        stopifnot(r <= 1 & r >= -1)
         fraction <- length(inSubset) / length(x)
         permutation_ecdf <- permute_ecdf(x = x, y = y, fraction = fraction, n_permut = 1000)
         r <- cor(x[inSubset], y[inSubset])
